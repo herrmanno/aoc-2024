@@ -1,5 +1,8 @@
 //! # Day 06
 
+use std::sync::Arc;
+use std::sync::RwLock;
+
 use aoc_runner::Day;
 use fxhash::FxHashMap as HashMap;
 use fxhash::FxHashSet as HashSet;
@@ -72,6 +75,8 @@ impl Day for Day06 {
         let mut direction = Dir::N;
         let mut visited: HashSet<Coord> = Default::default();
         let mut pos = self.start_pos;
+        let mut jump_table: JumpTable = Default::default();
+        let mut last_state = (pos, direction);
         loop {
             visited.insert(pos);
             let next_pos = direction.go(pos);
@@ -81,23 +86,38 @@ impl Day for Day06 {
             }
 
             if self.obstacles.contains(&next_pos) {
+                let new_state = (pos, direction);
+                jump_table.insert(last_state, new_state);
+                last_state = new_state;
+
                 direction = direction.turn_right();
             } else {
                 pos = next_pos;
             }
         }
 
+        let jump_table = Arc::new(RwLock::new(jump_table));
+
         visited
             .par_iter()
-            .filter(|pos| self.walk(self.start_pos, Dir::N, **pos))
+            .filter(|pos| self.walk(self.start_pos, Dir::N, **pos, Arc::clone(&jump_table)))
             .count() as <Self as Day>::Result2
     }
 }
 
+type JumpTable = HashMap<(Coord, Dir), (Coord, Dir)>;
+
 impl Day06 {
-    fn walk(&self, start: Coord, mut direction: Dir, obstacle: Coord) -> bool {
+    fn walk(
+        &self,
+        start: Coord,
+        mut direction: Dir,
+        obstacle: Coord,
+        jump_table: Arc<RwLock<JumpTable>>,
+    ) -> bool {
         let mut visited: HashMap<Coord, HashSet<Dir>> = Default::default();
         let mut pos = start;
+        // let mut last_state = Some((pos, direction));
 
         loop {
             let next_pos = direction.go(pos);
@@ -110,7 +130,36 @@ impl Day06 {
                 return true;
             }
 
-            if self.obstacles.contains(&next_pos) || next_pos == obstacle {
+            if self.obstacles.contains(&next_pos) {
+                if pos.0 != obstacle.0 && pos.1 != obstacle.1 {
+                    if let Ok(jump_table) = jump_table.read() {
+                        if let Some(new_state) = jump_table.get(&(pos, direction)) {
+                            pos = new_state.0;
+                            direction = new_state.1;
+                            direction = direction.turn_right();
+                            continue;
+                        }
+                    }
+                }
+
+                // if let Some(old_state) = last_state {
+                //     if let Ok(mut jump_table) = jump_table.write() {
+                //         let new_state = (pos, direction);
+                //         match jump_table.insert(old_state, new_state) {
+                //             Some(old_new_state) if new_state != old_new_state => {
+                //                 panic!("{:?} != {:?}", old_new_state, new_state)
+                //             }
+                //             _ => {}
+                //         }
+                //         last_state = Some(new_state);
+                //     }
+                // } else {
+                //     last_state = Some((pos, direction));
+                // }
+
+                direction = direction.turn_right();
+            } else if next_pos == obstacle {
+                // last_state = None;
                 direction = direction.turn_right();
             } else {
                 pos = next_pos;

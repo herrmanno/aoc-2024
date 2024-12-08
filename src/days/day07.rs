@@ -16,12 +16,7 @@ enum Concatenation {
 }
 
 impl Equation {
-    #[inline]
     fn is_valid(&self, concat: Concatenation) -> bool {
-        self.is_valid_iterative(concat)
-    }
-
-    fn is_valid_iterative(&self, concat: Concatenation) -> bool {
         let mut results: Vec<u64> = vec![self.parameters[0]];
         for p in &self.parameters[1..] {
             let mut next_results: Vec<u64> = Vec::with_capacity(results.len() * 2);
@@ -43,34 +38,6 @@ impl Equation {
         }
 
         results.contains(&self.result)
-    }
-
-    fn is_valid_recursive(&self, concat: Concatenation) -> bool {
-        fn go(r: u64, n: u64, ps: &[u64], concat: &Concatenation) -> bool {
-            if n > r {
-                return false;
-            }
-            if ps.len() == 0 {
-                return n == r;
-            }
-
-            let p = ps[0];
-            let ps = &ps[1..];
-            go(r, n + p, ps, concat)
-                || go(r, n * p, ps, concat)
-                || if concat == &Concatenation::WithConcatenation {
-                    go(r, n.concat(p), ps, concat)
-                } else {
-                    false
-                }
-        }
-
-        go(
-            self.result,
-            self.parameters[0],
-            &self.parameters[1..],
-            &concat,
-        )
     }
 }
 

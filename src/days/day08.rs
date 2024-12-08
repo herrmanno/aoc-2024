@@ -4,7 +4,6 @@ use aoc_runner::Day;
 use fxhash::FxHashMap as HashMap;
 use fxhash::FxHashSet as HashSet;
 use itertools::iterate;
-use itertools::Itertools;
 
 use crate::common::transform::Transform;
 

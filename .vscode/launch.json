@@ -19,7 +19,12 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": [
+                "9",
+                "2",
+                "-i",
+                "${workspaceFolder}/input/09.txt"
+            ],
             "cwd": "${workspaceFolder}"
         },
     ]

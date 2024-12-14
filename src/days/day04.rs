@@ -3,6 +3,7 @@
 use aoc_runner::Day;
 use fxhash::FxHashMap as HashMap;
 use itertools::iterate;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 const DIRS: [(i16, i16); 8] = [
     (-1, 0),
@@ -41,43 +42,64 @@ impl Day for Day04 {
         let max_x = self.max_x();
         let map = &self.0;
 
-        (0..=max_y)
-            .flat_map(move |y| (0..=max_x).map(move |x| (y, x)))
-            .flat_map(|(y, x)| {
-                DIRS.iter().filter(move |(dy, dx)| {
-                    let found = iterate((y, x), |(y, x)| (y + dy, x + dx))
-                        .take(4)
-                        .map(|(y, x)| map.get(&(y, x)))
-                        .collect::<Option<Vec<&char>>>();
+        DIRS.par_iter()
+            .map(move |(dy, dx)| {
+                (0..=max_y)
+                    .flat_map(move |y| (0..=max_x).map(move |x| (y, x)))
+                    .map(|(y, x)| {
+                        let found = iterate((y, x), |(y, x)| (y + dy, x + dx))
+                            .take(4)
+                            .map(|(y, x)| map.get(&(y, x)))
+                            .collect::<Option<Vec<&char>>>();
 
-                    matches!(found.as_deref(), Some(['X', 'M', 'A', 'S']))
-                })
+                        if matches!(found.as_deref(), Some(['X', 'M', 'A', 'S'])) {
+                            1
+                        } else {
+                            0
+                        }
+                    })
+                    .sum::<<Self as Day>::Result1>()
             })
-            .count() as <Day04 as Day>::Result1
+            .sum()
     }
 
     fn part2(&mut self) -> Self::Result2 {
         let max_y = self.max_y();
         let max_x = self.max_x();
         let map = &self.0;
-        let mut amap: HashMap<(i16, i16), u8> = HashMap::default();
 
-        (0..=max_y)
-            .flat_map(move |y| (0..=max_x).map(move |x| (y, x)))
-            .for_each(|(y, x)| {
-                DIRS_X.iter().for_each(|(dy, dx)| {
-                    let found = iterate((y, x), |(y, x)| (y + dy, x + dx))
-                        .take(3)
-                        .map(|(y, x)| map.get(&(y, x)))
-                        .collect::<Option<Vec<&char>>>();
+        // how many times is an 'A' part of a 'MAS'
+        let amap = DIRS_X
+            .par_iter()
+            .map(|(dy, dx)| {
+                let mut local_amap: HashMap<(i16, i16), u8> = HashMap::default();
+                (0..=max_y)
+                    .flat_map(move |y| (0..=max_x).map(move |x| (y, x)))
+                    .for_each(|(y, x)| {
+                        let found = iterate((y, x), |(y, x)| (y + dy, x + dx))
+                            .take(3)
+                            .map(|(y, x)| map.get(&(y, x)))
+                            .collect::<Option<Vec<&char>>>();
 
-                    if let Some(['M', 'A', 'S']) = found.as_deref() {
-                        let apos = (y + dy, x + dx);
-                        amap.entry(apos)
-                            .and_modify(|count| *count += 1)
-                            .or_insert(1);
-                    }
-                });
+                        if let Some(['M', 'A', 'S']) = found.as_deref() {
+                            let apos = (y + dy, x + dx);
+                            local_amap
+                                .entry(apos)
+                                .and_modify(|count| *count += 1)
+                                .or_insert(1);
+                        }
+                    });
+                local_amap
+            })
+            .reduce(Default::default, |a, b| {
+                let mut result: HashMap<(i16, i16), u8> = Default::default();
+                for (k, v) in a.into_iter() {
+                    *result.entry(k).or_default() += v;
+                }
+                for (k, v) in b.into_iter() {
+                    *result.entry(k).or_default() += v;
+                }
+                result
             });
 
         amap.into_iter().filter(|(_, count)| *count == 2).count() as <Day04 as Day>::Result1

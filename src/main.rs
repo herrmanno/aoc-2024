@@ -1,6 +1,7 @@
 use std::process::exit;
 
 use aoc2024::days::*;
+use itertools::Itertools;
 
 fn main() {
     let args = std::env::args().collect::<Vec<String>>();
@@ -12,11 +13,22 @@ fn main() {
     let mut days = Days::new();
     let (day, part) = get_args();
     if let Some(day) = day {
-        let input = std::io::stdin()
-            .lines()
-            .map(|line| line.unwrap())
-            .collect::<Vec<String>>()
-            .join("\n");
+        let args = std::env::args().collect::<Vec<String>>();
+        let input = if let Some(input_file_path) = args
+            .iter()
+            .find_position(|it| it == &"-i" || it == &"--input")
+            .map(|(idx, _)| idx + 1)
+            .and_then(|idx| args.get(idx))
+        {
+            std::fs::read_to_string(input_file_path)
+                .unwrap_or_else(|_| panic!("File not found: {}", input_file_path))
+        } else {
+            std::io::stdin()
+                .lines()
+                .map(|line| line.unwrap())
+                .collect::<Vec<String>>()
+                .join("\n")
+        };
 
         days.run_part(day, part, &input, &mut days.get_analyzer());
     } else {
@@ -35,9 +47,7 @@ fn get_args() -> (Option<usize>, Option<usize>) {
     let day = args
         .get(1)
         .map(|arg| arg.parse().expect("'day' must be a number"));
-    let part = args
-        .get(2)
-        .map(|arg| arg.parse().expect("'part' must be a number"));
+    let part = args.get(2).and_then(|arg| arg.parse().ok());
     (day, part)
 }
 

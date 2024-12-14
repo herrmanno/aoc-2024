@@ -57,6 +57,12 @@ bench_day!("04", day_04, aoc2024::days::day04::Day04);
 bench_day!("05", day_05, aoc2024::days::day05::Day05);
 bench_day!("06", day_06, aoc2024::days::day06::Day06);
 bench_day!("07", day_07, aoc2024::days::day07::Day07);
+bench_day!("08", day_08, aoc2024::days::day08::Day08);
+bench_day!("09", day_09, aoc2024::days::day09::Day09);
+bench_day!("10", day_10, aoc2024::days::day10::Day10);
+bench_day!("11", day_11, aoc2024::days::day11::Day11);
+bench_day!("12", day_12, aoc2024::days::day12::Day12);
+bench_day!("13", day_13, aoc2024::days::day13::Day13);
 
 criterion::criterion_main!(
     day_01::bench,
@@ -66,4 +72,10 @@ criterion::criterion_main!(
     day_05::bench,
     day_06::bench,
     day_07::bench,
+    day_08::bench,
+    day_09::bench,
+    day_10::bench,
+    day_11::bench,
+    day_12::bench,
+    day_13::bench,
 );

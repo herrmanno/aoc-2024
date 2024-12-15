@@ -67,10 +67,10 @@ impl TryFrom<char> for Dir {
 
     fn try_from(value: char) -> Result<Self, Self::Error> {
         match value {
-            'N' | 'U' => Ok(Dir::N),
-            'S' | 'D' => Ok(Dir::S),
-            'W' | 'L' => Ok(Dir::W),
-            'E' | 'R' => Ok(Dir::E),
+            'N' | 'U' | '^' => Ok(Dir::N),
+            'S' | 'D' | 'v' => Ok(Dir::S),
+            'W' | 'L' | '<' => Ok(Dir::W),
+            'E' | 'R' | '>' => Ok(Dir::E),
             _ => Err(value),
         }
     }

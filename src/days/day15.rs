@@ -23,46 +23,60 @@ struct Warehouse {
     walls: FxHashSet<Coord>,
     boxes: FxHashMap<Coord, Box>,
     robot: Coord,
-    wide: bool,
 }
 
 impl Warehouse {
-    fn widen(&mut self) {
-        self.robot = (self.robot.0, self.robot.1 * 2);
-        self.walls = self
-            .walls
-            .iter()
-            .flat_map(|(y, x)| [(*y, x * 2), (*y, x * 2 + 1)])
-            .collect();
-        self.boxes = self
-            .boxes
-            .iter()
-            .flat_map(|((y, x), _)| [((*y, x * 2), Box::Left), ((*y, x * 2 + 1), Box::Right)])
-            .collect();
-        self.wide = true;
+    fn from(value: &str, wide: bool) -> Self {
+        let mut walls: FxHashSet<Coord> = Default::default();
+        let mut boxes: FxHashMap<Coord, Box> = Default::default();
+        let mut robot: Coord = Default::default();
+        value.lines().enumerate().for_each(|(y, line)| {
+            line.chars().enumerate().for_each(|(x, ch)| match ch {
+                '#' => {
+                    if !wide {
+                        walls.insert((y as Num, x as Num));
+                    } else {
+                        walls.insert((y as Num, x as Num * 2));
+                        walls.insert((y as Num, x as Num * 2 + 1));
+                    }
+                }
+                'O' => {
+                    if !wide {
+                        boxes.insert((y as Num, x as Num), Box::Single);
+                    } else {
+                        boxes.insert((y as Num, x as Num * 2), Box::Left);
+                        boxes.insert((y as Num, x as Num * 2 + 1), Box::Right);
+                    }
+                }
+                '@' => {
+                    if !wide {
+                        robot = (y as Num, x as Num);
+                    } else {
+                        robot = (y as Num, x as Num * 2);
+                    }
+                }
+                _ => {}
+            })
+        });
+        Self {
+            walls,
+            boxes,
+            robot,
+        }
     }
 
     fn move_robot(&mut self, dir: Dir) {
         let next_pos = dir.go(self.robot);
-        // println!(
-        //     "Move robot from ({}, {}) to ({}, {})",
-        //     self.robot.0, self.robot.1, next_pos.0, next_pos.1
-        // );
-        if self.walls.contains(&next_pos) {
-            return;
-        } else if self.boxes.contains_key(&next_pos) {
+        if self.boxes.contains_key(&next_pos) {
             if self.move_box(next_pos, dir, true) {
-                // println!("Move box");
                 self.robot = next_pos;
-            } else {
-                return;
             }
-        } else {
+        } else if !self.walls.contains(&next_pos) {
             self.robot = next_pos;
         }
     }
 
-    fn move_box(&mut self, pos: Coord, dir: Dir, recurse: bool) -> bool {
+    fn move_box(&mut self, pos: Coord, dir: Dir, do_move: bool) -> bool {
         let next_pos = dir.go(pos);
         let other_pos = if matches!(dir, Dir::N | Dir::S) {
             match self.boxes.get(&pos) {
@@ -91,16 +105,32 @@ impl Warehouse {
                 .map(|p| self.boxes.contains_key(&p))
                 .unwrap_or(false)
         {
-            if self.can_move_box(next_pos, dir, true)
+            if self.move_box(next_pos, dir, false)
                 && other_next_pos
-                    .map(|p| self.can_move_box(p, dir, false))
+                    .map(|p| self.move_box(p, dir, false))
                     .unwrap_or(true)
             {
-                self.move_box(next_pos, dir, true);
+                self.move_box(next_pos, dir, do_move);
                 if let Some(other_next_pos) = other_next_pos {
-                    self.move_box(other_next_pos, dir, true);
+                    self.move_box(other_next_pos, dir, do_move);
                 }
 
+                if do_move {
+                    if let Some(b) = self.boxes.remove(&pos) {
+                        self.boxes.insert(next_pos, b);
+                    }
+                    if let Some(other_pos) = other_pos {
+                        if let Some(b) = self.boxes.remove(&other_pos) {
+                            self.boxes.insert(other_next_pos.unwrap(), b);
+                        }
+                    }
+                }
+                true
+            } else {
+                false
+            }
+        } else {
+            if do_move {
                 if let Some(b) = self.boxes.remove(&pos) {
                     self.boxes.insert(next_pos, b);
                 }
@@ -109,62 +139,7 @@ impl Warehouse {
                         self.boxes.insert(other_next_pos.unwrap(), b);
                     }
                 }
-                true
-            } else {
-                false
             }
-        } else {
-            if let Some(b) = self.boxes.remove(&pos) {
-                self.boxes.insert(next_pos, b);
-            }
-            if let Some(other_pos) = other_pos {
-                if let Some(b) = self.boxes.remove(&other_pos) {
-                    self.boxes.insert(other_next_pos.unwrap(), b);
-                }
-            }
-            true
-        }
-    }
-
-    fn can_move_box(&mut self, pos: Coord, dir: Dir, recurse: bool) -> bool {
-        let next_pos = dir.go(pos);
-        let other_pos = if matches!(dir, Dir::N | Dir::S) {
-            match self.boxes.get(&pos) {
-                Some(Box::Left) => Some(Dir::E.go(pos)),
-                Some(Box::Right) => Some(Dir::W.go(pos)),
-                _ => None,
-            }
-        } else {
-            None
-        };
-        let other_next_pos = other_pos.map(|p| dir.go(p));
-
-        // part of box was already moved when its counterpart was moved
-        if !self.boxes.contains_key(&pos) {
-            return true;
-        }
-
-        if self.walls.contains(&next_pos)
-            || other_next_pos
-                .map(|p| self.walls.contains(&p))
-                .unwrap_or(false)
-        {
-            false
-        } else if self.boxes.contains_key(&next_pos)
-            || other_next_pos
-                .map(|p| self.boxes.contains_key(&p))
-                .unwrap_or(false)
-        {
-            if self.can_move_box(next_pos, dir, true)
-                && other_next_pos
-                    .map(|p| self.can_move_box(p, dir, false))
-                    .unwrap_or(true)
-            {
-                true
-            } else {
-                false
-            }
-        } else {
             true
         }
     }
@@ -181,34 +156,6 @@ impl Warehouse {
                 Box::Right => 0,
             })
             .sum()
-    }
-}
-
-impl From<&str> for Warehouse {
-    fn from(value: &str) -> Self {
-        let mut walls: FxHashSet<Coord> = Default::default();
-        let mut boxes: FxHashMap<Coord, Box> = Default::default();
-        let mut robot: Coord = Default::default();
-        value.lines().enumerate().for_each(|(y, line)| {
-            line.chars().enumerate().for_each(|(x, ch)| match ch {
-                '#' => {
-                    walls.insert((y as Num, x as Num));
-                }
-                'O' => {
-                    boxes.insert((y as Num, x as Num), Box::Single);
-                }
-                '@' => {
-                    robot = (y as Num, x as Num);
-                }
-                _ => {}
-            })
-        });
-        Self {
-            wide: false,
-            walls,
-            boxes,
-            robot,
-        }
     }
 }
 
@@ -240,7 +187,7 @@ impl Display for Warehouse {
 
 #[derive(Default, Clone)]
 pub struct Day15 {
-    warehouse: Warehouse,
+    warehouse_str: String,
     moves: Vec<Dir>,
 }
 
@@ -250,7 +197,7 @@ impl Day for Day15 {
 
     fn parse(&mut self, input: &str) {
         let (warehouse, movements) = input.split_once("\n\n").unwrap();
-        self.warehouse = warehouse.into();
+        self.warehouse_str = warehouse.into();
         self.moves = movements
             .chars()
             .filter(|c| *c != '\n')
@@ -259,25 +206,19 @@ impl Day for Day15 {
     }
 
     fn part1(&mut self) -> Self::Result1 {
-        // println!("{}", self.warehouse);
+        let mut warehouse = Warehouse::from(&self.warehouse_str, false);
         for m in self.moves.iter() {
-            self.warehouse.move_robot(*m);
-            // println!("{:?}", m);
-            // println!("{}", self.warehouse);
+            warehouse.move_robot(*m);
         }
-        self.warehouse.box_gps_sum()
+        warehouse.box_gps_sum()
     }
 
     fn part2(&mut self) -> Self::Result2 {
-        self.warehouse.widen();
-        // println!("{}", self.warehouse);
+        let mut warehouse = Warehouse::from(&self.warehouse_str, true);
         for m in self.moves.iter() {
-            self.warehouse.move_robot(*m);
-            // println!("{:?}", m);
-            // println!("{}", self.warehouse);
+            warehouse.move_robot(*m);
         }
-        // println!("{}", self.warehouse);
-        self.warehouse.box_gps_sum()
+        warehouse.box_gps_sum()
     }
 }
 

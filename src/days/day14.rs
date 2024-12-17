@@ -3,8 +3,8 @@
 use std::fmt::{Display, Write};
 
 use aoc_runner::Day;
-use bit_set::BitSet;
-use fxhash::FxHashMap;
+
+use crate::common::chinese_remainder::chinese_remainder;
 
 type Num = i32;
 
@@ -112,16 +112,31 @@ impl<const H: usize, const W: usize> Day for Day14<H, W> {
             .unwrap()
     }
 
+    /// # Part 2
+    ///
+    /// As all robot's x-values repeat with a cycle length of W and all robot's y-values repeat with
+    /// a cylce length of H, find the cycle offset, that indicates a anomaly for the x and the y
+    /// dimension indepentently and calclutate the moment those pattern appear together via
+    /// chinese reminder theorem.
+    ///
+    /// Hint: this only works if H and W are prime.
     fn part2(&mut self) -> Self::Result2 {
-        let mut poss: BitSet = BitSet::with_capacity(W * H);
-        let mut numbers: Vec<usize> = Vec::with_capacity(self.0.iter().count());
-        for i in 1..10000 {
-            poss.clear();
-            numbers.clear();
+        let mut y_counts = [0; H];
+        let mut x_counts = [0; W];
+        let mut y_iter = (0, 0);
+        let mut x_iter = (0, 0);
+
+        for i in 1..W.max(H) {
+            for n in y_counts.iter_mut() {
+                *n = 0;
+            }
+            for n in x_counts.iter_mut() {
+                *n = 0;
+            }
 
             self.0
                 .iter()
-                .map(|r| r.pos_at(i))
+                .map(|r| r.pos_at(i as u32))
                 .map(|(y, x)| {
                     (
                         y.rem_euclid(H as Num) as usize,
@@ -129,20 +144,22 @@ impl<const H: usize, const W: usize> Day for Day14<H, W> {
                     )
                 })
                 .for_each(|(y, x)| {
-                    poss.insert(y * H + x);
-                    numbers.push(y * H + x);
+                    y_counts[y] += 1;
+                    x_counts[x] += 1;
                 });
 
-            let candidate = numbers.iter().any(|value| {
-                (1..5).all(|diff| poss.contains(value + diff) && poss.contains(value + diff * H))
-            });
-
-            if candidate {
-                return i;
+            let y_max = y_counts.iter().max().unwrap();
+            if *y_max > y_iter.1 {
+                y_iter = (i, *y_max);
+            }
+            let x_max = x_counts.iter().max().unwrap();
+            if *x_max > x_iter.1 {
+                x_iter = (i, *x_max);
             }
         }
 
-        panic!("No solution found");
+        chinese_remainder(&[y_iter.0 as i64, x_iter.0 as i64], &[H as i64, W as i64]).unwrap()
+            as <Self as Day>::Result2
     }
 }
 

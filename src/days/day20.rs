@@ -1,71 +1,59 @@
 //! # Day 20
 
-use std::collections::VecDeque;
-
 use aoc_runner::Day;
-use bit_set::BitSet;
-use fxhash::{FxHashMap, FxHashSet};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use fxhash::FxHashSet;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use crate::common::dir::Dir;
 
 type Num = i16;
 type Coord = (Num, Num);
 
+fn distance(a: Coord, b: Coord) -> usize {
+    (a.0.abs_diff(b.0) + a.1.abs_diff(b.1)) as usize
+}
+
 #[derive(Default, Clone)]
 struct Maze {
     walls: FxHashSet<Coord>,
     start: Coord,
     end: Coord,
-    size: (Num, Num),
 }
 
 impl Maze {
-    fn contains(&self, pos: Coord) -> bool {
-        pos.0 >= 0 && pos.1 >= 0 && pos.0 < self.size.0 && pos.1 < self.size.1
-    }
-
-    fn coord_to_usize(&self, (y, x): Coord) -> usize {
-        (y * self.size.0 + x) as usize
-    }
-
     fn get_cheats<const THRESHOLD: usize>(&self, cheat_len: usize) -> usize {
         let course = self.get_course();
 
         course
             .par_iter()
-            .map(|(pos, cost)| {
-                let mut cheats = 0;
-                type State = (Coord, usize);
-                let mut visited: BitSet = Default::default();
-                let mut agenda: VecDeque<State> = VecDeque::from([(*pos, 0)]);
-                while let Some((cheat_pos, len)) = agenda.pop_front() {
-                    if len > cheat_len {
-                        break;
+            .enumerate()
+            .map(|(i, p)| {
+                let mut num_cheats = 0;
+                let mut j = i + 1;
+                while j < course.len() {
+                    let q = course[j];
+                    let d = distance(p.0, q.0);
+                    // if distance(p, q) > max_cheat_length, advance q to skip tne next
+                    // distance(p, q) - max_cheat_length spots that are definitely also
+                    // too far away to be a valid cheat target.
+                    if d > cheat_len {
+                        j += d - cheat_len;
+                        continue;
                     }
 
-                    if let Some(cheat_cost) = course.get(&cheat_pos) {
-                        if *cheat_cost > *cost + 2 && (cheat_cost - cost - len) >= THRESHOLD {
-                            cheats += 1;
-                        }
+                    if d <= cheat_len && (q.1 - p.1 - d) >= THRESHOLD {
+                        num_cheats += 1;
                     }
 
-                    for d in Dir::ALL {
-                        let new_state = (d.go(cheat_pos), len + 1);
-                        if self.contains(new_state.0)
-                            && visited.insert(self.coord_to_usize(new_state.0))
-                        {
-                            agenda.push_back(new_state);
-                        }
-                    }
+                    j += 1;
                 }
-                cheats
+                num_cheats
             })
-            .reduce(|| 0, |acc, cheats| acc + cheats)
+            .sum()
     }
 
-    fn get_course(&self) -> FxHashMap<Coord, usize> {
-        let mut course: FxHashMap<Coord, usize> = Default::default();
+    fn get_course(&self) -> Vec<(Coord, usize)> {
+        let mut course: Vec<(Coord, usize)> = Default::default();
         let mut pos = self.start;
         let mut step = 0;
 
@@ -75,7 +63,7 @@ impl Maze {
             .expect("No start direction");
 
         loop {
-            course.insert(pos, step);
+            course.push((pos, step));
 
             if pos == self.end {
                 break;
@@ -97,10 +85,6 @@ impl Maze {
 
 impl From<&str> for Maze {
     fn from(value: &str) -> Self {
-        let size = (
-            value.lines().count() as Num,
-            value.lines().next().unwrap().chars().count() as Num,
-        );
         let mut walls: FxHashSet<Coord> = Default::default();
         let mut start: Coord = Default::default();
         let mut end: Coord = Default::default();
@@ -121,12 +105,7 @@ impl From<&str> for Maze {
                 }
             }
         }
-        Self {
-            size,
-            walls,
-            start,
-            end,
-        }
+        Self { walls, start, end }
     }
 }
 

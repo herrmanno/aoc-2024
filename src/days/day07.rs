@@ -19,7 +19,7 @@ impl Equation {
     fn is_valid(&self, concat: Concatenation) -> bool {
         let mut results: Vec<u64> = vec![self.parameters[0]];
         for p in &self.parameters[1..] {
-            let mut next_results: Vec<u64> = Vec::with_capacity(results.len() * 2);
+            let mut next_results: Vec<u64> = Vec::with_capacity(results.len() * 3);
             for r in results.iter() {
                 if let Some(n) = Some(r + p).take_if(|it| *it <= self.result) {
                     next_results.push(n);
@@ -87,10 +87,6 @@ trait Concat {
 
 impl Concat for u64 {
     fn concat(self, rhs: Self) -> Self {
-        // if self == 1 {
-        //     return 10 + rhs;
-        // }
-
         let factor10 = if rhs == 1 {
             10
         } else {

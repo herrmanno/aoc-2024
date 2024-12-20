@@ -69,6 +69,7 @@ bench_day!("16", day_16, aoc2024::days::day16::Day16);
 bench_day!("17", day_17, aoc2024::days::day17::Day17);
 bench_day!("18", day_18, aoc2024::days::day18::Day18);
 bench_day!("19", day_19, aoc2024::days::day19::Day19);
+bench_day!("20", day_20, aoc2024::days::day20::Day20);
 
 criterion::criterion_main!(
     day_01::bench,
@@ -90,4 +91,5 @@ criterion::criterion_main!(
     day_17::bench,
     day_18::bench,
     day_19::bench,
+    day_20::bench,
 );

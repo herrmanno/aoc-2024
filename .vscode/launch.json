@@ -20,10 +20,10 @@
                 }
             },
             "args": [
-                "21",
-                "1",
+                "22",
+                "2",
                 "-i",
-                "${workspaceFolder}/input/21.test"
+                "${workspaceFolder}/input/22.test"
             ],
             "cwd": "${workspaceFolder}"
         },

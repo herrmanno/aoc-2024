@@ -1,16 +1,16 @@
 //! # Day 22
 
 use aoc_runner::Day;
-use fxhash::FxHashMap;
 use itertools::iterate;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 type Num = u64;
 
+#[inline]
 fn next_secret(mut i: Num) -> Num {
-    i = (i ^ (i << 6)) % 16777216;
-    i = (i ^ (i >> 5)) % 16777216;
-    i = (i ^ (i << 11)) % 16777216;
+    const MASK: Num = 16777216 - 1;
+    i = (i ^ (i << 6)) & MASK;
+    i = (i ^ (i >> 5)) & MASK;
+    i = (i ^ (i << 11)) & MASK;
     i
 }
 
@@ -33,8 +33,11 @@ impl Day for Day22 {
     }
 
     fn part2(&mut self) -> Self::Result2 {
-        type SequenceMap = FxHashMap<Sequence, Num>;
+        const MAX_SEQUENCE: usize = ((19 as Num).pow(4) - 1) as usize;
+        type SequenceMap = Vec<Num>;
         type Sequence = usize;
+
+        #[inline]
         fn to_sequence(diffs: &[i8], n: usize) -> Sequence {
             // diffs are in [-9, 9]
             const MAX: usize = 19;
@@ -45,37 +48,36 @@ impl Day for Day22 {
                 .unwrap()
         }
 
-        let sequencemap = self
-            .0
-            .par_iter()
-            .map(|&i| {
-                let mut local_sequencemap: SequenceMap = Default::default();
-                let mut diffs = [0i8; 4];
-                let mut curr = i;
-                for n in 0..=2000 {
-                    let next = next_secret(curr);
-                    let diff = (next % 10) as i8 - (curr % 10) as i8;
-                    diffs[n % 4] = diff;
-                    if n >= 3 {
-                        let seq = to_sequence(&diffs, n - 3);
-                        local_sequencemap.entry(seq).or_insert_with(|| next % 10);
-                    }
-                    curr = next;
-                }
-                local_sequencemap
-            })
-            .reduce(SequenceMap::default, |mut acc, it| {
-                it.into_iter().for_each(|(k, v)| {
-                    acc.entry(k)
-                        .and_modify(|it| {
-                            *it += v;
-                        })
-                        .or_insert(v);
-                });
-                acc
-            });
+        let mut max = 0;
+        let mut sequencemap: SequenceMap = vec![0; MAX_SEQUENCE];
+        let mut seen = vec![false; MAX_SEQUENCE];
+        for &i in self.0.iter() {
+            seen.clear();
+            seen.resize(MAX_SEQUENCE, false);
 
-        *sequencemap.values().max().unwrap()
+            let mut diffs = [0i8; 4];
+            let mut curr = i;
+            for n in 0..3 {
+                let next = next_secret(curr);
+                let diff = (next % 10) as i8 - (curr % 10) as i8;
+                diffs[n % 4] = diff;
+                curr = next;
+            }
+            for n in 3..=2000 {
+                let next = next_secret(curr);
+                let diff = (next % 10) as i8 - (curr % 10) as i8;
+                diffs[n % 4] = diff;
+                let seq = to_sequence(&diffs, n - 3);
+                if !seen[seq] {
+                    seen[seq] = true;
+                    sequencemap[seq] += next % 10;
+                    max = max.max(sequencemap[seq]);
+                }
+                curr = next;
+            }
+        }
+
+        max
     }
 }
 
